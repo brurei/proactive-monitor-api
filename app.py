@@ -1167,7 +1167,8 @@ def generate_report():
             pdf.ln()
             fill = not fill
 
-        file_path = "relatorio_reembolsos_completo.pdf"
+        file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'relatorio_reembolsos_completo.pdf')
+
         pdf.output(file_path)
 
         return send_file(file_path, as_attachment=True)
