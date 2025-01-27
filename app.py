@@ -1459,63 +1459,45 @@ def load_log_data_dash():
     log_data = []
 
     try:
-        csv_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'falhas_reembolso_errors.json')
-
-        with open(csv_file_path, 'r') as file:
-            for line in file:
-                log_entry = json.loads(line)
-
-                # Correção para acessar e converter o campo created_at dentro de timestamps
-                created_at_str = log_entry.get("timestamps", {}).get("created_at", None)
-                validated_at_str = log_entry.get("timestamps", {}).get("validated_at", None)
-
-                # Conversão segura para datetime
-                created_at = datetime.strptime(created_at_str, "%d/%m/%Y %H:%M:%S") if created_at_str else None
-                validated_at = datetime.strptime(validated_at_str, "%d/%m/%Y %H:%M:%S") if validated_at_str else None
-
-                # Calcular tempo de processamento
-                if created_at and validated_at:
-                    tempo_processamento = (validated_at - created_at).total_seconds() / 3600
-                else:
-                    tempo_processamento = 0
-
-                item = {
-                    "protocolo": str(log_entry.get("protocolo", "Não disponível")),
-                    # Garantindo o protocolo como string
-                    "status": log_entry.get("validation_result", {}).get("status", "Não disponível"),
-                    "valor_apresentado": float(log_entry.get("request_data", {}).get("valor_apresentado", 0)),
-                    "status_operacao": log_entry.get("request_data", {}).get("status_operacao", "Não disponível"),
-                    "motivo_status_workflow": log_entry.get("request_data", {}).get("motivo_status_workflow",
-                                                                                    "Não disponível"),
-                    "tempo_processamento": tempo_processamento,
-                    "prestador": log_entry.get("request_data", {}).get("razao_social_prestador", "Não disponível"),
-                    "created_at": created_at  # Incluindo no DataFrame
+        # Leitura em blocos para evitar sobrecarga de memória
+        with open('falhas_reembolso_errors.json', 'r') as file:
+            log_data = [
+                {
+                    "protocolo": str(entry.get("protocolo", "Não disponível")),
+                    "status": entry.get("validation_result", {}).get("status", "Não disponível"),
+                    "valor_apresentado": float(entry.get("request_data", {}).get("valor_apresentado", 0)),
+                    "status_operacao": entry.get("request_data", {}).get("status_operacao", "Não disponível"),
+                    "motivo_status_workflow": entry.get("request_data", {}).get("motivo_status_workflow", "Não disponível"),
+                    "tempo_processamento": (
+                        (datetime.strptime(entry.get("timestamps", {}).get("validated_at", ""), "%d/%m/%Y %H:%M:%S") -
+                         datetime.strptime(entry.get("timestamps", {}).get("created_at", ""), "%d/%m/%Y %H:%M:%S")).total_seconds() / 3600
+                        if entry.get("timestamps", {}).get("validated_at") and entry.get("timestamps", {}).get("created_at")
+                        else 0
+                    ),
+                    "prestador": entry.get("request_data", {}).get("razao_social_prestador", "Não disponível"),
+                    "created_at": entry.get("timestamps", {}).get("created_at", None)
                 }
-                log_data.append(item)
+                for entry in (json.loads(line) for line in file)
+            ]
 
     except Exception as e:
         print(f"Erro ao carregar arquivo de log: {e}")
+        return pd.DataFrame()  # Retorna DataFrame vazio em caso de erro
 
     # Transformar em DataFrame
     df = pd.DataFrame(log_data)
 
-    # Garantir a conversão da coluna 'created_at'
-    df['created_at'] = pd.to_datetime(df['created_at'], errors='coerce')
+    # Converter 'created_at' para datetime
+    df['created_at'] = pd.to_datetime(df['created_at'], format="%d/%m/%Y %H:%M:%S", errors='coerce')
 
-    # Identificar reprocessamentos
-    def verificar_reprocessamento(protocolo):
-        ocorrencias = df[df['protocolo'] == protocolo]
-        if ocorrencias.shape[0] > 1:
-            if (ocorrencias['status'] == 'sucesso').any():
-                return 'Sim', 'Sucesso'
-            elif (ocorrencias['status'] == 'falha').sum() > 1:
-                return 'Sim', 'Falha'
-        return 'Não', 'Não Reprocessado'
-
-    # Aplicar a lógica de reprocessamento
-    df[["reprocessado", "status_reprocessamento"]] = df["protocolo"].apply(
-        lambda x: pd.Series(verificar_reprocessamento(x))
+    # Calcular reprocessamentos em lote
+    reprocessamento = df.groupby('protocolo').agg(
+        reprocessado=('status', lambda x: 'Sim' if x.size > 1 else 'Não'),
+        status_reprocessamento=('status', lambda x: 'Sucesso' if 'sucesso' in x.values else ('Falha' if (x == 'falha').sum() > 1 else 'Não Reprocessado'))
     )
+
+    # Combinar resultados de reprocessamento com o DataFrame principal
+    df = df.merge(reprocessamento, on='protocolo', how='left')
 
     return df
 
