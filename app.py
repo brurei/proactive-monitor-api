@@ -294,7 +294,9 @@ def summary_data():
 def load_logs():
     log_data = []
     try:
-        with open('falhas_reembolso_errors.json', 'r') as file:
+         csv_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'falhas_reembolso_errors.json')
+
+        with open(csv_file_path, 'r') as file:
             for line in file:
                 log_entry = json.loads(line)
                 item = {
@@ -1033,7 +1035,9 @@ def load_log_data():
 
     log_data = []
     try:
-        with open('falhas_reembolso_errors.json', 'r') as file:
+        csv_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'falhas_reembolso_errors.json')
+
+        with open(csv_file_path, 'r') as file:
             for line in file:
                 log_entry = json.loads(line)
                 item = {
@@ -1195,7 +1199,9 @@ def chart_data_spider():
 log_data = load_log_data()
 def load_log_data_teste():
     try:
-        with open('falhas_reembolso_errors.json', 'r') as file:
+        csv_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'falhas_reembolso_errors.json')
+
+        with open(csv_file_path, 'r') as file:
             return [json.loads(line) for line in file]
     except Exception as e:
         print(f"Erro ao carregar dados reais: {e}")
@@ -1213,6 +1219,8 @@ def bar_chart_data():
 @swag_from(SwaggerDocumentation.load_bar_chart_data_doc())
 def load_bar_chart_data():
     try:
+        csv_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'falhas_reembolso_errors.json')
+
         with open('falhas_reembolso_errors.json', 'r') as file:
             log_data = [json.loads(line) for line in file]
             status_counts = {}
@@ -1459,7 +1467,9 @@ def load_log_data_dash():
     log_data = []
 
     try:
-        with open('falhas_reembolso_errors.json', 'r') as file:
+        csv_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'falhas_reembolso_errors.json')
+
+        with open(csv_file_path, 'r') as file:
             for line in file:
                 log_entry = json.loads(line)
 
