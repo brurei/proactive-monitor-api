@@ -17,6 +17,7 @@ from matplotlib import pyplot as plt
 from sentence_transformers import SentenceTransformer
 
 app = Flask(__name__)
+
 class LogAI:
     def __init__(self, log_file_path):
         self.log_file_path = log_file_path
@@ -153,7 +154,7 @@ class LogAI:
         consolidated_response = "\n\n".join(responses)
         return consolidated_response
 
-log_ai = LogAI('falhas_reembolso_errors2.json')
+#log_ai = LogAI('falhas_reembolso_errors2.json')
 #log_ai.load_logs()
 #log_ai.generate_embeddings()
 # Credenciais padrão
@@ -1835,8 +1836,8 @@ def ask():
 
     try:
         # Processar os logs completos divididos em chunks
-        response = log_ai.process_full_logs(question)
-       # return ''
+        #response = log_ai.process_full_logs(question)
+        return ''
         return jsonify({"response": response})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
