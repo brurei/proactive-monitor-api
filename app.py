@@ -833,9 +833,79 @@ template = """
     </script>
 </head>
 <body>
+     <img src="https://saudepetrobras.com.br/data/files/5F/D3/80/3D/FDFEB7108831CAB7004CF9C2/logo_desktop.svg" alt="Logo">
+        <h1>GPROTREE - Gestor de Protocolos de Reembolso</h1>
+        <div class="chat-container" id="chat-container">
+        <div class="chat-header">Fale com o ReemBotAi</div>
+        <div id="chat" class="chat-box"></div>
+        <div id="loading" class="loading" style="display: none;">Gerando resposta, por favor aguarde...</div>
+        <div class="input-container">
+            <input type="text" id="question" placeholder="Faça sua pergunta..." onkeypress="handleKeyPress(event)">
+            <button onclick="askQuestion()">Enviar</button>
+        </div>
+    </div>
+
+    <div class="chat-toggle" onclick="toggleChat()">
+        <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRHaZ9bsbOJ4y5Q-WSbxj2hnRMhLUDwCl3G9w&s" alt="Chat">
+    </div>
+
+    <script>
+        function toggleChat() {
+            const chatContainer = document.getElementById('chat-container');
+            chatContainer.style.display = chatContainer.style.display === 'flex' ? 'none' : 'flex';
+        }
+
+        async function askQuestion() {
+            const questionInput = document.getElementById('question');
+            const chatBox = document.getElementById('chat');
+            const loadingIndicator = document.getElementById('loading');
+
+            const question = questionInput.value.trim();
+            if (!question) return;
+
+            const userMessage = document.createElement('div');
+            userMessage.className = 'message user';
+            userMessage.innerHTML = `<div class='bubble'>${question}</div>`;
+            chatBox.appendChild(userMessage);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            questionInput.value = '';
+
+            loadingIndicator.style.display = 'block';
+
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question })
+                });
+
+                const data = await response.json();
+                const botMessage = document.createElement('div');
+                botMessage.className = 'message bot';
+                botMessage.innerHTML = `<div class='bubble'>${data.response || data.error}</div>`;
+                chatBox.appendChild(botMessage);
+                chatBox.scrollTop = chatBox.scrollHeight;
+            } catch (error) {
+                const errorMessage = document.createElement('div');
+                errorMessage.className = 'message bot';
+                errorMessage.innerHTML = `<div class='bubble'>Erro ao se comunicar com o servidor.</div>`;
+                chatBox.appendChild(errorMessage);
+                chatBox.scrollTop = chatBox.scrollHeight;
+            } finally {
+                loadingIndicator.style.display = 'none';
+            }
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                askQuestion();
+            }
+        }
+    </script>
  <header>
         <img src="https://saudepetrobras.com.br/data/files/5F/D3/80/3D/FDFEB7108831CAB7004CF9C2/logo_desktop.svg" alt="Logo">
-        <h1>GPROTREE - Gestor de Protocolos de Reembolso</h1>
+        <h1>GPROTREE - Gestor de Protocolos de Reembolsooooooo</h1>
         <div class="chat-container" id="chat-container">
         <div class="chat-header">Fale com o ReemBotAi</div>
         <div id="chat" class="chat-box"></div>
