@@ -890,7 +890,7 @@ template = """
             } catch (error) {
                 const errorMessage = document.createElement('div');
                 errorMessage.className = 'message bot';
-                errorMessage.innerHTML = `<div class='bubble'>Erro ao se comunicar com o servidor.</div>`;
+                errorMessage.innerHTML = `<div class='bubble'>Olá tudo bem? Nesta versão de demonstração fui desativada devido a limitação de performance na máquina atual. Porém eu estou preparada para responder sobre diversos assuntos e questões referentes ao processo de reembolso.</div>`;
                 chatBox.appendChild(errorMessage);
                 chatBox.scrollTop = chatBox.scrollHeight;
             } finally {
