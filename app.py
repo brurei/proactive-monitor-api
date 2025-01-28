@@ -7,7 +7,6 @@ import requests
 
 from flasgger import Swagger, swag_from
 
-from django.contrib.sites import requests
 from flask import Flask, render_template_string, request, jsonify, send_file, session, redirect, url_for
 import math
 from fpdf import FPDF
