@@ -154,7 +154,7 @@ class LogAI:
         consolidated_response = "\n\n".join(responses)
         return consolidated_response
 
-log_ai = LogAI('falhas_reembolso_errors2.json')
+#log_ai = LogAI('falhas_reembolso_errors2.json')
 #log_ai.load_logs()
 #log_ai.generate_embeddings()
 # Credenciais padrão
