@@ -44,9 +44,6 @@ class LogAI:
         # Carregar o arquivo em chunks para evitar alto consumo de memória
 
         chunks = pd.read_json(self.log_file_path, lines=True, chunksize=1000)
-
-
-
         processed_data = []
 
         for chunk in chunks:
