@@ -277,7 +277,7 @@ class LogAI:
 
 
 
-log_ai = LogAI('falhas_reembolso_errors.json')
+log_ai = LogAI('falhas_reembolso_errors2.json')
 
 log_ai.load_logs()
 
