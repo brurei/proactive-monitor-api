@@ -3,5 +3,5 @@ flasgger==0.9.7.2.dev2
 fpdf==1.7.2
 pandas==2.2.3
 matplotlib==3.9.2
-django==5.0.4
+gunicorn
 requests==2.32.2
