@@ -17,7 +17,6 @@ from matplotlib import pyplot as plt
 from sentence_transformers import SentenceTransformer
 
 app = Flask(__name__)
-
 class LogAI:
     def __init__(self, log_file_path):
         self.log_file_path = log_file_path
