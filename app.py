@@ -3,8 +3,10 @@ import json
 import os
 from datetime import datetime
 import random
-import requests
 
+import requests
+import tiktoken
+import torch
 from flasgger import Swagger, swag_from
 
 from flask import Flask, render_template_string, request, jsonify, send_file, session, redirect, url_for
@@ -12,10 +14,149 @@ import math
 from fpdf import FPDF
 import pandas as pd
 from matplotlib import pyplot as plt
+from sentence_transformers import SentenceTransformer
 
 app = Flask(__name__)
 
+class LogAI:
+    def __init__(self, log_file_path):
+        self.log_file_path = log_file_path
+        self.api_key = os.getenv('OPENAI_API_KEY', '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')
+        self.data = None
+        self.contexts = []
+        self.embeddings = []
+        self.model = SentenceTransformer('all-mpnet-base-v2')  # Usando modelo mais assertivo para embeddings
+        self.max_tokens = 4096  # Máximo permitido pelo modelo (ajustado para contexto seguro)
 
+    def load_logs(self):
+        """Load and preprocess logs from the file with optimized performance."""
+        # Carregar o arquivo em chunks para evitar alto consumo de memória
+        chunks = pd.read_json(self.log_file_path, lines=True, chunksize=1000)
+
+        processed_data = []
+        for chunk in chunks:
+            # Certificar-se de que os dados são strings antes de concatenar
+            chunk['protocolo'] = chunk['protocolo'].astype(str)
+            chunk['endpoint'] = chunk['endpoint'].astype(str)
+            chunk['response_message'] = chunk['response_message'].astype(str)
+            chunk['request_data'] = chunk['request_data'].apply(
+                lambda x: ', '.join([f"{key}: {value}" for key, value in x.items()])
+                if isinstance(x, dict) else ""
+            )
+            chunk['timestamps'] = chunk['timestamps'].apply(
+                lambda x: ', '.join([f"{key}: {value}" for key, value in x.items()])
+                if isinstance(x, dict) else ""
+            )
+            chunk['validation_result'] = chunk['validation_result'].apply(
+                lambda x: x['status'] if isinstance(x, dict) and 'status' in x else ""
+            )
+
+            # Criar a coluna 'context' com as strings formatadas
+            chunk['context'] = (
+                    "Protocolo: " + chunk['protocolo'] +
+                    "\nEndpoint: " + chunk['endpoint'] +
+                    "\nMensagem: " + chunk['response_message'] +
+                    "\nDados da requisição: " + chunk['request_data'] +
+                    "\nTimestamps: " + chunk['timestamps'] +
+                    "\nResultado da validação: " + chunk['validation_result']
+            )
+            processed_data.append(chunk[['context']])
+
+        # Concatenar todos os chunks em um único DataFrame
+        self.data = pd.concat(processed_data, ignore_index=True)
+        self.contexts = self.data['context'].tolist()
+
+    def generate_embeddings(self, batch_size=64):
+        """Generate embeddings for the logs using Sentence Transformers in batches."""
+        self.embeddings = []
+        for i in range(0, len(self.contexts), batch_size):
+            batch_contexts = self.contexts[i:i + batch_size]
+            batch_embeddings = self.model.encode(batch_contexts, convert_to_tensor=True)
+            self.embeddings.append(batch_embeddings)
+
+        # Concatenar todos os embeddings em um único tensor
+        self.embeddings = torch.cat(self.embeddings)
+    def calculate_token_count(self, text):
+        """Calculate the number of tokens in a given text."""
+        encoding = tiktoken.get_encoding("cl100k_base")  # Modelo compatível com GPT-4
+        return len(encoding.encode(text))
+
+    def split_contexts(self, contexts, max_context_tokens):
+        """Split contexts into chunks that fit within the token limit."""
+        chunks = []
+        current_chunk = []
+        current_tokens = 0
+
+        for context in contexts:
+            context_tokens = self.calculate_token_count(context)
+            if current_tokens + context_tokens <= max_context_tokens:
+                current_chunk.append(context)
+                current_tokens += context_tokens
+            else:
+                chunks.append(current_chunk)
+                current_chunk = [context]
+                current_tokens = context_tokens
+
+        if current_chunk:
+            chunks.append(current_chunk)
+
+        return chunks
+
+    def perguntar_openai(self, pergunta, contexto):
+        """Ask OpenAI GPT-4 using the relevant contexts."""
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {self.api_key}'
+        }
+
+        examples = "Exemplos: Perguntas sobre protocolos, validações, ou endpoints."
+        prompt = f"""
+        Você é um assistente que responde perguntas com base nos logs fornecidos. Seja assertivo e detalhado.
+        {examples}
+
+        Aqui estão os logs relevantes (truncados para evitar excesso de tokens):
+        {'\n'.join(contexto)}
+
+        Pergunta: {pergunta}
+        Resposta:"""
+
+        data = {
+            "model": "gpt-4",
+            "messages": [
+                {"role": "system", "content": "Você é um especialista em análise de logs."},
+                {"role": "user", "content": prompt}
+            ],
+            "max_tokens": 1000,
+            "temperature": 0.3
+        }
+
+        response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
+
+        if response.status_code == 200:
+            return response.json()['choices'][0]['message']['content']
+        else:
+            raise Exception(f"Erro na requisição para o GPT-4: {response.text}")
+
+    def process_full_logs(self, pergunta):
+        """Process the entire log file by splitting it into manageable chunks."""
+        max_context_tokens = self.max_tokens - 1000  # Reservar espaço para a pergunta e a resposta
+        chunks = self.split_contexts(self.contexts, max_context_tokens)
+
+        responses = []
+        for chunk in chunks:
+            try:
+                response = self.perguntar_openai(pergunta, chunk)
+                responses.append(response)
+            except Exception as e:
+                responses.append(f"Erro ao processar chunk: {e}")
+
+        # Consolidar respostas
+        consolidated_response = "\n\n".join(responses)
+        return consolidated_response
+
+log_ai = LogAI('falhas_reembolso_errors2.json')
+#log_ai.load_logs()
+#log_ai.generate_embeddings()
 # Credenciais padrão
 DEFAULT_USERNAME = 'admin'
 DEFAULT_PASSWORD = 'admin'
@@ -335,6 +476,7 @@ def login():
     <!DOCTYPE html>
     <html lang='en'>
     <head>
+    
         <meta charset='UTF-8'>
         <meta name='viewport' content='width=device-width, initial-scale=1.0'>
         <title>Login</title>
@@ -347,13 +489,14 @@ def login():
             button {{ width: 100%; padding: 12px; background: linear-gradient(45deg, #007BFF, #00CFFF); color: white; border: none; border-radius: 5px; cursor: pointer; }}
             button:hover {{ background: linear-gradient(45deg, #0056b3, #007BFF); }}
         </style>
-        
     </head>
     <body>
+    
        <header>
         <img src="https://saudepetrobras.com.br/data/files/5F/D3/80/3D/FDFEB7108831CAB7004CF9C2/logo_desktop.svg" alt="Logo">
         <center><h2>GPROTREE - Gestor de Protocolos de Reembolso</h2></center>
     </header>
+    
         <div class="container">
         
             <h2 style="text-align: center;">Login</h2>
@@ -424,6 +567,66 @@ template = """
     <meta charset="UTF-8">
     <title>Gestor de Protocolos de Reembolso</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet">
+   <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; }
+        .chat-container { 
+            max-width: 600px; 
+            margin: 0; 
+            background: #ffffff; 
+            border-radius: 8px; 
+            box-shadow: 0 0 10px rgba(0,0,0,0.1); 
+            display: none; 
+            flex-direction: column; 
+            position: fixed; 
+            bottom: 80px; 
+            right: 20px; 
+            width: 350px; 
+            z-index: 1000; 
+        }
+        .chat-header { 
+            background-color: #006c67; 
+            color: #ffffff; 
+            padding: 15px; 
+            text-align: center; 
+            font-size: 18px; 
+            font-weight: bold; 
+        }
+        .chat-box { 
+            padding: 15px; 
+            flex: 1; 
+            overflow-y: auto; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 10px; 
+            max-height: 400px;
+        }
+        .chat-box .message { display: flex; align-items: flex-start; }
+        .chat-box .message.user { justify-content: flex-end; }
+        .chat-box .message.user .bubble { background-color: #006c67; color: #ffffff; }
+        .chat-box .message.bot .bubble { background-color: #e8f1f2; color: #000000; }
+        .chat-box .bubble { max-width: 70%; padding: 10px; border-radius: 15px; font-size: 14px; line-height: 1.5; }
+        .input-container { display: flex; padding: 10px; background-color: #f0f0f0; border-top: 1px solid #ddd; }
+        .input-container input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 20px; font-size: 14px; }
+        .input-container button { margin-left: 10px; padding: 10px 20px; border: none; background-color: #006c67; color: white; border-radius: 20px; cursor: pointer; font-size: 14px; }
+        .chat-toggle { 
+            position: fixed; 
+            bottom: 20px; 
+            right: 20px; 
+            width: 60px; 
+            height: 60px; 
+            background-color: #006c67; 
+            border-radius: 50%; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); 
+            cursor: pointer; 
+            z-index: 1000; 
+        }
+        .chat-toggle img { width: 30px; height: 30px; }
+        .loading { color: #006c67; font-size: 14px; font-style: italic; margin-top: 10px; }
+    </style>
+   
     <style>
         .charts-container {
             display: flex;
@@ -633,9 +836,77 @@ template = """
  <header>
         <img src="https://saudepetrobras.com.br/data/files/5F/D3/80/3D/FDFEB7108831CAB7004CF9C2/logo_desktop.svg" alt="Logo">
         <h1>GPROTREE - Gestor de Protocolos de Reembolso</h1>
-        
+        <div class="chat-container" id="chat-container">
+        <div class="chat-header">Fale com o ReemBotAi</div>
+        <div id="chat" class="chat-box"></div>
+        <div id="loading" class="loading" style="display: none;">Gerando resposta, por favor aguarde...</div>
+        <div class="input-container">
+            <input type="text" id="question" placeholder="Faça sua pergunta..." onkeypress="handleKeyPress(event)">
+            <button onclick="askQuestion()">Enviar</button>
+        </div>
+    </div>
+
+    <div class="chat-toggle" onclick="toggleChat()">
+        <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRHaZ9bsbOJ4y5Q-WSbxj2hnRMhLUDwCl3G9w&s" alt="Chat">
+    </div>
+
+    <script>
+        function toggleChat() {
+            const chatContainer = document.getElementById('chat-container');
+            chatContainer.style.display = chatContainer.style.display === 'flex' ? 'none' : 'flex';
+        }
+
+        async function askQuestion() {
+            const questionInput = document.getElementById('question');
+            const chatBox = document.getElementById('chat');
+            const loadingIndicator = document.getElementById('loading');
+
+            const question = questionInput.value.trim();
+            if (!question) return;
+
+            const userMessage = document.createElement('div');
+            userMessage.className = 'message user';
+            userMessage.innerHTML = `<div class='bubble'>${question}</div>`;
+            chatBox.appendChild(userMessage);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            questionInput.value = '';
+
+            loadingIndicator.style.display = 'block';
+
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question })
+                });
+
+                const data = await response.json();
+                const botMessage = document.createElement('div');
+                botMessage.className = 'message bot';
+                botMessage.innerHTML = `<div class='bubble'>${data.response || data.error}</div>`;
+                chatBox.appendChild(botMessage);
+                chatBox.scrollTop = chatBox.scrollHeight;
+            } catch (error) {
+                const errorMessage = document.createElement('div');
+                errorMessage.className = 'message bot';
+                errorMessage.innerHTML = `<div class='bubble'>Erro ao se comunicar com o servidor.</div>`;
+                chatBox.appendChild(errorMessage);
+                chatBox.scrollTop = chatBox.scrollHeight;
+            } finally {
+                loadingIndicator.style.display = 'none';
+            }
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                askQuestion();
+            }
+        }
+    </script>
     </header>
 <h1>Estatísticas</h1>
+
 <div class="charts-container">
         <div class="pizza-chart-box">
             <canvas id="pizzaChart"></canvas>
@@ -760,10 +1031,7 @@ template = """
                 });
             });
     </script>
-   
-   
-       
-
+ 
         <form method="POST" action="/generate_report">
             <label for="start_date">Data Inicial:</label>
             <input type="date" id="start_date" name="start_date" required>
@@ -1167,8 +1435,7 @@ def generate_report():
             pdf.ln()
             fill = not fill
 
-        file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'relatorio_reembolsos_completo.pdf')
-
+        file_path = "relatorio_reembolsos_completo.pdf"
         pdf.output(file_path)
 
         return send_file(file_path, as_attachment=True)
@@ -1560,5 +1827,20 @@ def dashboard_graficos_tendencia():
     }
 
     return jsonify({'tendenciaFalhasSucessos': tendencia_falhas_sucessos})
+
+@app.route('/ask', methods=['POST'])
+def ask():
+    question = request.json.get('question', '')
+    if not question:
+        return jsonify({"error": "Pergunta não fornecida."}), 400
+
+    try:
+        # Processar os logs completos divididos em chunks
+        response = log_ai.process_full_logs(question)
+       # return ''
+        return jsonify({"response": response})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000)
