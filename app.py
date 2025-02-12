@@ -18,143 +18,143 @@ from matplotlib import pyplot as plt
 
 app = Flask(__name__)
 
-class LogAI:
-    def __init__(self, log_file_path):
-        self.log_file_path = log_file_path
-        self.api_key = os.getenv('OPENAI_API_KEY', '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')
-        self.data = None
-        self.contexts = []
-        self.embeddings = []
-       # self.model = SentenceTransformer('all-mpnet-base-v2')  # Usando modelo mais assertivo para embeddings
-        self.max_tokens = 4096  # Máximo permitido pelo modelo (ajustado para contexto seguro)
+#class LogAI:
+#    def __init__(self, log_file_path):
+#        self.log_file_path = log_file_path
+#        self.api_key = os.getenv('OPENAI_API_KEY', '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')
+#        self.data = None
+#        self.contexts = []
+#        self.embeddings = []
+#        self.model = SentenceTransformer('all-mpnet-base-v2')  # Usando modelo mais assertivo para embeddings
+#        self.max_tokens = 4096  # Máximo permitido pelo modelo (ajustado para contexto seguro)
 
-    def load_logs(self):
-        """Load and preprocess logs from the file with optimized performance."""
-        # Carregar o arquivo em chunks para evitar alto consumo de memória
-        chunks = pd.read_json(self.log_file_path, lines=True, chunksize=1000)
+#    def load_logs(self):
+#        """Load and preprocess logs from the file with optimized performance."""
+#        # Carregar o arquivo em chunks para evitar alto consumo de memória
+#        chunks = pd.read_json(self.log_file_path, lines=True, chunksize=1000)
 
-        processed_data = []
-        for chunk in chunks:
-            # Certificar-se de que os dados são strings antes de concatenar
-            chunk['protocolo'] = chunk['protocolo'].astype(str)
-            chunk['endpoint'] = chunk['endpoint'].astype(str)
-            chunk['response_message'] = chunk['response_message'].astype(str)
-            chunk['request_data'] = chunk['request_data'].apply(
-                lambda x: ', '.join([f"{key}: {value}" for key, value in x.items()])
-                if isinstance(x, dict) else ""
-            )
-            chunk['timestamps'] = chunk['timestamps'].apply(
-                lambda x: ', '.join([f"{key}: {value}" for key, value in x.items()])
-                if isinstance(x, dict) else ""
-            )
-            chunk['validation_result'] = chunk['validation_result'].apply(
-                lambda x: x['status'] if isinstance(x, dict) and 'status' in x else ""
-            )
+#        processed_data = []
+#        for chunk in chunks:
+#            # Certificar-se de que os dados são strings antes de concatenar
+#            chunk['protocolo'] = chunk['protocolo'].astype(str)
+#            chunk['endpoint'] = chunk['endpoint'].astype(str)
+#            chunk['response_message'] = chunk['response_message'].astype(str)
+#            chunk['request_data'] = chunk['request_data'].apply(
+#                lambda x: ', '.join([f"{key}: {value}" for key, value in x.items()])
+#                if isinstance(x, dict) else ""
+#            )
+#            chunk['timestamps'] = chunk['timestamps'].apply(
+#                lambda x: ', '.join([f"{key}: {value}" for key, value in x.items()])
+#                if isinstance(x, dict) else ""
+#            )
+#            chunk['validation_result'] = chunk['validation_result'].apply(
+#                lambda x: x['status'] if isinstance(x, dict) and 'status' in x else ""
+#            )
 
-            # Criar a coluna 'context' com as strings formatadas
-            chunk['context'] = (
-                    "Protocolo: " + chunk['protocolo'] +
-                    "\nEndpoint: " + chunk['endpoint'] +
-                    "\nMensagem: " + chunk['response_message'] +
-                    "\nDados da requisição: " + chunk['request_data'] +
-                    "\nTimestamps: " + chunk['timestamps'] +
-                    "\nResultado da validação: " + chunk['validation_result']
-            )
-            processed_data.append(chunk[['context']])
+#            # Criar a coluna 'context' com as strings formatadas
+#            chunk['context'] = (
+#                    "Protocolo: " + chunk['protocolo'] +
+#                    "\nEndpoint: " + chunk['endpoint'] +
+#                    "\nMensagem: " + chunk['response_message'] +
+#                    "\nDados da requisição: " + chunk['request_data'] +
+#                    "\nTimestamps: " + chunk['timestamps'] +
+#                    "\nResultado da validação: " + chunk['validation_result']
+#            )
+#            processed_data.append(chunk[['context']])
 
         # Concatenar todos os chunks em um único DataFrame
-        self.data = pd.concat(processed_data, ignore_index=True)
-        self.contexts = self.data['context'].tolist()
+#        self.data = pd.concat(processed_data, ignore_index=True)
+#        self.contexts = self.data['context'].tolist()
 
-    def generate_embeddings(self, batch_size=64):
-        """Generate embeddings for the logs using Sentence Transformers in batches."""
-        self.embeddings = []
-        for i in range(0, len(self.contexts), batch_size):
-            batch_contexts = self.contexts[i:i + batch_size]
-            batch_embeddings = self.model.encode(batch_contexts, convert_to_tensor=True)
-            self.embeddings.append(batch_embeddings)
+#    def generate_embeddings(self, batch_size=64):
+#        """Generate embeddings for the logs using Sentence Transformers in batches."""
+#        self.embeddings = []
+#        for i in range(0, len(self.contexts), batch_size):
+#            batch_contexts = self.contexts[i:i + batch_size]
+#            batch_embeddings = self.model.encode(batch_contexts, convert_to_tensor=True)
+#            self.embeddings.append(batch_embeddings)
 
         # Concatenar todos os embeddings em um único tensor
-        self.embeddings = torch.cat(self.embeddings)
-    def calculate_token_count(self, text):
-        """Calculate the number of tokens in a given text."""
-        encoding = tiktoken.get_encoding("cl100k_base")  # Modelo compatível com GPT-4
-        return len(encoding.encode(text))
+#        self.embeddings = torch.cat(self.embeddings)
+#    def calculate_token_count(self, text):
+#        """Calculate the number of tokens in a given text."""
+#        encoding = tiktoken.get_encoding("cl100k_base")  # Modelo compatível com GPT-4
+#        return len(encoding.encode(text))
 
-    def split_contexts(self, contexts, max_context_tokens):
-        """Split contexts into chunks that fit within the token limit."""
-        chunks = []
-        current_chunk = []
-        current_tokens = 0
+ #   def split_contexts(self, contexts, max_context_tokens):
+ #       """Split contexts into chunks that fit within the token limit."""
+ #       chunks = []
+ #       current_chunk = []
+ #       current_tokens = 0
 
-        for context in contexts:
-            context_tokens = self.calculate_token_count(context)
-            if current_tokens + context_tokens <= max_context_tokens:
-                current_chunk.append(context)
-                current_tokens += context_tokens
-            else:
-                chunks.append(current_chunk)
-                current_chunk = [context]
-                current_tokens = context_tokens
+ #       for context in contexts:
+ #           context_tokens = self.calculate_token_count(context)
+ #           if current_tokens + context_tokens <= max_context_tokens:
+ #               current_chunk.append(context)
+ #               current_tokens += context_tokens
+ #           else:
+ #               chunks.append(current_chunk)
+ #               current_chunk = [context]
+ #               current_tokens = context_tokens
 
-        if current_chunk:
-            chunks.append(current_chunk)
+ #       if current_chunk:
+ #           chunks.append(current_chunk)
 
-        return chunks
+ #       return chunks
 
-    def perguntar_openai(self, pergunta, contexto):
-        """Ask OpenAI GPT-4 using the relevant contexts."""
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': f'Bearer {self.api_key}'
-        }
+ #   def perguntar_openai(self, pergunta, contexto):
+ #       """Ask OpenAI GPT-4 using the relevant contexts."""
+ #       headers = {
+ #           'Content-Type': 'application/json',
+ #           'Authorization': f'Bearer {self.api_key}'
+ #       }
 
-        examples = "Exemplos: Perguntas sobre protocolos, validações, ou endpoints."
-        prompt = f"""
-        Você é um assistente que responde perguntas com base nos logs fornecidos. Seja assertivo e detalhado.
-        {examples}
+ #       examples = "Exemplos: Perguntas sobre protocolos, validações, ou endpoints."
+ #       prompt = f"""
+ #       Você é um assistente que responde perguntas com base nos logs fornecidos. Seja assertivo e detalhado.
+ #       {examples}
 
-        Aqui estão os logs relevantes (truncados para evitar excesso de tokens):
-        {'\n'.join(contexto)}
+ #       Aqui estão os logs relevantes (truncados para evitar excesso de tokens):
+ #       {'\n'.join(contexto)}
 
-        Pergunta: {pergunta}
-        Resposta:"""
+ #       Pergunta: {pergunta}
+ #       Resposta:"""
 
-        data = {
-            "model": "gpt-4",
-            "messages": [
-                {"role": "system", "content": "Você é um especialista em análise de logs."},
-                {"role": "user", "content": prompt}
-            ],
-            "max_tokens": 1000,
-            "temperature": 0.3
-        }
+#        data = {
+#            "model": "gpt-4",
+#            "messages": [
+#                {"role": "system", "content": "Você é um especialista em análise de logs."},
+#                {"role": "user", "content": prompt}
+#            ],
+#            "max_tokens": 1000,
+#            "temperature": 0.3
+#        }
 
-        response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
+#        response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
 
-        if response.status_code == 200:
-            return response.json()['choices'][0]['message']['content']
-        else:
-            raise Exception(f"Erro na requisição para o GPT-4: {response.text}")
+#        if response.status_code == 200:
+#            return response.json()['choices'][0]['message']['content']
+#        else:
+#            raise Exception(f"Erro na requisição para o GPT-4: {response.text}")
 
-    def process_full_logs(self, pergunta):
-        """Process the entire log file by splitting it into manageable chunks."""
-        max_context_tokens = self.max_tokens - 1000  # Reservar espaço para a pergunta e a resposta
-        chunks = self.split_contexts(self.contexts, max_context_tokens)
+#    def process_full_logs(self, pergunta):
+#        """Process the entire log file by splitting it into manageable chunks."""
+#        max_context_tokens = self.max_tokens - 1000  # Reservar espaço para a pergunta e a resposta
+#        chunks = self.split_contexts(self.contexts, max_context_tokens)
 
-        responses = []
-        for chunk in chunks:
-            try:
-                response = self.perguntar_openai(pergunta, chunk)
-                responses.append(response)
-            except Exception as e:
-                responses.append(f"Erro ao processar chunk: {e}")
+#        responses = []
+#        for chunk in chunks:
+#            try:
+#                response = self.perguntar_openai(pergunta, chunk)
+#                responses.append(response)
+#            except Exception as e:
+#                responses.append(f"Erro ao processar chunk: {e}")
 
         # Consolidar respostas
-        consolidated_response = "\n\n".join(responses)
-        return consolidated_response
+#        consolidated_response = "\n\n".join(responses)
+#        return consolidated_response
 
-#log_ai = LogAI('falhas_reembolso_errors22.json')
+#log_ai = LogAI('falhas_reembolso_errors2.json')
 #log_ai.load_logs()
 #log_ai.generate_embeddings()
 # Credenciais padrão
@@ -435,7 +435,7 @@ def summary_data():
 def load_logs():
     log_data = []
     try:
-        with open('falhas_reembolso_errors2.json', 'r') as file:
+        with open('falhas_reembolso_errors.json', 'r') as file:
             for line in file:
                 log_entry = json.loads(line)
                 item = {
@@ -890,7 +890,7 @@ template = """
             } catch (error) {
                 const errorMessage = document.createElement('div');
                 errorMessage.className = 'message bot';
-                errorMessage.innerHTML = `<div class='bubble'>Olá tudo bem? Nesta versão de demonstração fui desativada devido a limitação de performance na máquina atual. Porém eu estou preparada para responder sobre diversos assuntos e questões referentes ao processo de reembolso.</div>`;
+                errorMessage.innerHTML = `<div class='bubble'>Erro ao se comunicar com o servidor.</div>`;
                 chatBox.appendChild(errorMessage);
                 chatBox.scrollTop = chatBox.scrollHeight;
             } finally {
@@ -1301,7 +1301,7 @@ def load_log_data():
 
     log_data = []
     try:
-        with open('falhas_reembolso_errors2.json', 'r') as file:
+        with open('falhas_reembolso_errors.json', 'r') as file:
             for line in file:
                 log_entry = json.loads(line)
                 item = {
@@ -1463,7 +1463,7 @@ def chart_data_spider():
 log_data = load_log_data()
 def load_log_data_teste():
     try:
-        with open('falhas_reembolso_errors2.json', 'r') as file:
+        with open('falhas_reembolso_errors.json', 'r') as file:
             return [json.loads(line) for line in file]
     except Exception as e:
         print(f"Erro ao carregar dados reais: {e}")
@@ -1481,7 +1481,7 @@ def bar_chart_data():
 @swag_from(SwaggerDocumentation.load_bar_chart_data_doc())
 def load_bar_chart_data():
     try:
-        with open('falhas_reembolso_errors2.json', 'r') as file:
+        with open('falhas_reembolso_errors.json', 'r') as file:
             log_data = [json.loads(line) for line in file]
             status_counts = {}
             for item in log_data:
@@ -1728,7 +1728,7 @@ def load_log_data_dash():
 
     try:
         # Leitura em blocos para evitar sobrecarga de memória
-        with open('falhas_reembolso_errors2.json', 'r') as file:
+        with open('falhas_reembolso_errors.json', 'r') as file:
             log_data = [
                 {
                     "protocolo": str(entry.get("protocolo", "Não disponível")),
@@ -1836,13 +1836,11 @@ def ask():
 
     try:
         # Processar os logs completos divididos em chunks
-        #response = log_ai.process_full_logs(question)
+      #  response = log_ai.process_full_logs(question)
         return ''
-        return jsonify({"response": response})
+      #  return jsonify({"response": response})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
 if __name__ == '__main__':
-      app.run(host='0.0.0.0', port=8000)
-
+    app.run(host='0.0.0.0', port=8000)
