@@ -5,8 +5,8 @@ from datetime import datetime
 import random
 
 import requests
-import tiktoken
-import torch
+#import tiktoken
+#import torch
 from flasgger import Swagger, swag_from
 
 from flask import Flask, render_template_string, request, jsonify, send_file, session, redirect, url_for
