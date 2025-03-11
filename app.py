@@ -5,8 +5,8 @@ from datetime import datetime
 import random
 
 import requests
-#import tiktoken
-#import torch
+import tiktoken
+import torch
 from flasgger import Swagger, swag_from
 
 from flask import Flask, render_template_string, request, jsonify, send_file, session, redirect, url_for
@@ -14,147 +14,146 @@ import math
 from fpdf import FPDF
 import pandas as pd
 from matplotlib import pyplot as plt
-#from sentence_transformers import SentenceTransformer
+from sentence_transformers import SentenceTransformer
 
 app = Flask(__name__)
 
-#class LogAI:
-#    def __init__(self, log_file_path):
-#        self.log_file_path = log_file_path
-#        self.api_key = os.getenv('OPENAI_API_KEY', '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')
-#        self.data = None
-#        self.contexts = []
-#        self.embeddings = []
-#        self.model = SentenceTransformer('all-mpnet-base-v2')  # Usando modelo mais assertivo para embeddings
-#        self.max_tokens = 4096  # Máximo permitido pelo modelo (ajustado para contexto seguro)
+class LogAI:
+    def __init__(self, log_file_path):
+        self.log_file_path = log_file_path
+        self.api_key = os.getenv('OPENAI_API_KEY', '9U1ghdnceq8RZON7AaYYA8PRVdI95EzWNSHFLl8Ke4Q03MV4a4xnJQQJ99BBACZoyfiXJ3w3AAAAACOGVhkN')
+        self.data = None
+        self.contexts = []
+        self.embeddings = []
+        self.model = SentenceTransformer('all-mpnet-base-v2')  # Usando modelo mais assertivo para embeddings
+        self.max_tokens = 4096  # Máximo permitido pelo modelo (ajustado para contexto seguro)
 
-#    def load_logs(self):
-#        """Load and preprocess logs from the file with optimized performance."""
-#        # Carregar o arquivo em chunks para evitar alto consumo de memória
-#        chunks = pd.read_json(self.log_file_path, lines=True, chunksize=1000)
+    def load_logs(self):
+        """Load and preprocess logs from the file with optimized performance."""
+        # Carregar o arquivo em chunks para evitar alto consumo de memória
+        chunks = pd.read_json(self.log_file_path, lines=True, chunksize=1000)
 
-#        processed_data = []
-#        for chunk in chunks:
-#            # Certificar-se de que os dados são strings antes de concatenar
-#            chunk['protocolo'] = chunk['protocolo'].astype(str)
-#            chunk['endpoint'] = chunk['endpoint'].astype(str)
-#            chunk['response_message'] = chunk['response_message'].astype(str)
-#            chunk['request_data'] = chunk['request_data'].apply(
-#                lambda x: ', '.join([f"{key}: {value}" for key, value in x.items()])
-#                if isinstance(x, dict) else ""
-#            )
-#            chunk['timestamps'] = chunk['timestamps'].apply(
-#                lambda x: ', '.join([f"{key}: {value}" for key, value in x.items()])
-#                if isinstance(x, dict) else ""
-#            )
-#            chunk['validation_result'] = chunk['validation_result'].apply(
-#                lambda x: x['status'] if isinstance(x, dict) and 'status' in x else ""
-#            )
+        processed_data = []
+        for chunk in chunks:
+            # Certificar-se de que os dados são strings antes de concatenar
+            chunk['protocolo'] = chunk['protocolo'].astype(str)
+            chunk['endpoint'] = chunk['endpoint'].astype(str)
+            chunk['response_message'] = chunk['response_message'].astype(str)
+            chunk['request_data'] = chunk['request_data'].apply(
+                lambda x: ', '.join([f"{key}: {value}" for key, value in x.items()])
+                if isinstance(x, dict) else ""
+            )
+            chunk['timestamps'] = chunk['timestamps'].apply(
+                lambda x: ', '.join([f"{key}: {value}" for key, value in x.items()])
+                if isinstance(x, dict) else ""
+            )
+            chunk['validation_result'] = chunk['validation_result'].apply(
+                lambda x: x['status'] if isinstance(x, dict) and 'status' in x else ""
+            )
 
-#            # Criar a coluna 'context' com as strings formatadas
-#            chunk['context'] = (
-#                    "Protocolo: " + chunk['protocolo'] +
-#                    "\nEndpoint: " + chunk['endpoint'] +
-#                    "\nMensagem: " + chunk['response_message'] +
-#                    "\nDados da requisição: " + chunk['request_data'] +
-#                    "\nTimestamps: " + chunk['timestamps'] +
-#                    "\nResultado da validação: " + chunk['validation_result']
-#            )
-#            processed_data.append(chunk[['context']])
+            # Criar a coluna 'context' com as strings formatadas
+            chunk['context'] = (
+                    "Protocolo: " + chunk['protocolo'] +
+                    "\nEndpoint: " + chunk['endpoint'] +
+                    "\nMensagem: " + chunk['response_message'] +
+                    "\nDados da requisição: " + chunk['request_data'] +
+                    "\nTimestamps: " + chunk['timestamps'] +
+                    "\nResultado da validação: " + chunk['validation_result']
+            )
+            processed_data.append(chunk[['context']])
 
         # Concatenar todos os chunks em um único DataFrame
-#        self.data = pd.concat(processed_data, ignore_index=True)
-#        self.contexts = self.data['context'].tolist()
-
-#    def generate_embeddings(self, batch_size=64):
-#        """Generate embeddings for the logs using Sentence Transformers in batches."""
-#        self.embeddings = []
-#        for i in range(0, len(self.contexts), batch_size):
-#            batch_contexts = self.contexts[i:i + batch_size]
-#            batch_embeddings = self.model.encode(batch_contexts, convert_to_tensor=True)
-#            self.embeddings.append(batch_embeddings)
+        self.data = pd.concat(processed_data, ignore_index=True)
+        self.contexts = self.data['context'].tolist()
+    #def generate_embeddings(self, batch_size=64):
+    #    """Generate embeddings for the logs using Sentence Transformers in batches."""
+    #    self.embeddings = []
+    #    for i in range(0, len(self.contexts), batch_size):
+    #        batch_contexts = self.contexts[i:i + batch_size]
+    #        batch_embeddings = self.model.encode(batch_contexts, convert_to_tensor=True)
+    #        self.embeddings.append(batch_embeddings)
 
         # Concatenar todos os embeddings em um único tensor
-#        self.embeddings = torch.cat(self.embeddings)
-#    def calculate_token_count(self, text):
-#        """Calculate the number of tokens in a given text."""
-#        encoding = tiktoken.get_encoding("cl100k_base")  # Modelo compatível com GPT-4
-#        return len(encoding.encode(text))
+        self.embeddings = torch.cat(self.embeddings)
+    def calculate_token_count(self, text):
+        """Calculate the number of tokens in a given text."""
+        encoding = tiktoken.get_encoding("cl100k_base")  # Modelo compatível com GPT-4
+        return len(encoding.encode(text))
 
- #   def split_contexts(self, contexts, max_context_tokens):
- #       """Split contexts into chunks that fit within the token limit."""
- #       chunks = []
- #       current_chunk = []
- #       current_tokens = 0
+    def split_contexts(self, contexts, max_context_tokens):
+       """Split contexts into chunks that fit within the token limit."""
+       chunks = []
+       current_chunk = []
+       current_tokens = 0
 
- #       for context in contexts:
- #           context_tokens = self.calculate_token_count(context)
- #           if current_tokens + context_tokens <= max_context_tokens:
- #               current_chunk.append(context)
- #               current_tokens += context_tokens
- #           else:
- #               chunks.append(current_chunk)
- #               current_chunk = [context]
- #               current_tokens = context_tokens
+       for context in contexts:
+           context_tokens = self.calculate_token_count(context)
+           if current_tokens + context_tokens <= max_context_tokens:
+               current_chunk.append(context)
+               current_tokens += context_tokens
+           else:
+               chunks.append(current_chunk)
+               current_chunk = [context]
+               current_tokens = context_tokens
 
- #       if current_chunk:
- #           chunks.append(current_chunk)
+       if current_chunk:
+           chunks.append(current_chunk)
 
- #       return chunks
+       return chunks
 
- #   def perguntar_openai(self, pergunta, contexto):
- #       """Ask OpenAI GPT-4 using the relevant contexts."""
- #       headers = {
- #           'Content-Type': 'application/json',
- #           'Authorization': f'Bearer {self.api_key}'
- #       }
+    def perguntar_openai(self, pergunta, contexto):
+       """Ask OpenAI GPT-4 using the relevant contexts."""
+       headers = {
+          'Content-Type': 'application/json',
+           'Authorization': f'Bearer {self.api_key}'
+       }
 
- #       examples = "Exemplos: Perguntas sobre protocolos, validações, ou endpoints."
- #       prompt = f"""
- #       Você é um assistente que responde perguntas com base nos logs fornecidos. Seja assertivo e detalhado.
- #       {examples}
+       examples = "Exemplos: Perguntas sobre protocolos, validações, ou endpoints."
+       prompt = f"""
+       Você é um assistente que responde perguntas com base nos logs fornecidos. Seja assertivo e detalhado.
+       {examples}
 
- #       Aqui estão os logs relevantes (truncados para evitar excesso de tokens):
- #       {'\n'.join(contexto)}
+       Aqui estão os logs relevantes (truncados para evitar excesso de tokens):
+       {'\n'.join(contexto)}
 
- #       Pergunta: {pergunta}
- #       Resposta:"""
+       Pergunta: {pergunta}
+       Resposta:"""
 
-#        data = {
-#            "model": "gpt-4",
-#            "messages": [
-#                {"role": "system", "content": "Você é um especialista em análise de logs."},
-#                {"role": "user", "content": prompt}
-#            ],
-#            "max_tokens": 1000,
-#            "temperature": 0.3
-#        }
+       data = {
+            "model": "gpt-4",
+            "messages": [
+                {"role": "system", "content": "Você é um especialista em análise de logs."},
+                {"role": "user", "content": prompt}
+            ],
+            "max_tokens": 1000,
+            "temperature": 0.3
+        }
 
-#        response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
+       response = requests.post('https://proact-ai-monitor.openai.azure.com/openai/deployments/gpt-4-turbo/chat/completions?api-version=2023-07-01-preview', headers=headers, json=data)
 
-#        if response.status_code == 200:
-#            return response.json()['choices'][0]['message']['content']
-#        else:
-#            raise Exception(f"Erro na requisição para o GPT-4: {response.text}")
+       if response.status_code == 200:
+            return response.json()['choices'][0]['message']['content']
+       else:
+            raise Exception(f"Erro na requisição para o GPT-4: {response.text}")
 
-#    def process_full_logs(self, pergunta):
-#        """Process the entire log file by splitting it into manageable chunks."""
-#        max_context_tokens = self.max_tokens - 1000  # Reservar espaço para a pergunta e a resposta
-#        chunks = self.split_contexts(self.contexts, max_context_tokens)
+    def process_full_logs(self, pergunta):
+        """Process the entire log file by splitting it into manageable chunks."""
+        max_context_tokens = self.max_tokens - 1000  # Reservar espaço para a pergunta e a resposta
+        chunks = self.split_contexts(self.contexts, max_context_tokens)
 
-#        responses = []
-#        for chunk in chunks:
-#            try:
-#                response = self.perguntar_openai(pergunta, chunk)
-#                responses.append(response)
-#            except Exception as e:
-#                responses.append(f"Erro ao processar chunk: {e}")
+        responses = []
+        for chunk in chunks:
+            try:
+                response = self.perguntar_openai(pergunta, chunk)
+                responses.append(response)
+            except Exception as e:
+                responses.append(f"Erro ao processar chunk: {e}")
 
         # Consolidar respostas
-#        consolidated_response = "\n\n".join(responses)
-#        return consolidated_response
+        consolidated_response = "\n\n".join(responses)
+        return consolidated_response
 
-#log_ai = LogAI('falhas_reembolso_errors2.json')
+#log_ai = LogAI('falhas_reembolso_errors.json')
 #log_ai.load_logs()
 #log_ai.generate_embeddings()
 # Credenciais padrão
@@ -567,6 +566,27 @@ template = """
     <meta charset="UTF-8">
     <title>Gestor de Protocolos de Reembolso</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet">
+      <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+        .sidebar {
+            width: 250px; height: 100vh; background-color: #333; color: white;
+            position: fixed; left: -250px; top: 0; padding-top: 20px;
+            transition: left 0.3s;
+        }
+        .sidebar a {
+            display: block; color: white; padding: 10px; text-decoration: none;
+        }
+        .sidebar a:hover { background-color: #575757; }
+        .content { margin-left: 20px; padding: 20px; transition: margin-left 0.3s; }
+        .menu-btn {
+            font-size: 30px; cursor: pointer; padding: 10px; background-color: #333;
+            color: white; border: none; position: fixed; top: 10px; left: 10px;
+            z-index: 1000;
+        }
+        .iframe-container {
+            width: 100%; height: 80vh; border: none; display: none;
+        }
+    </style>
    <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; }
         .chat-container { 
@@ -783,7 +803,9 @@ template = """
                             <td>${item.nome_completo}</td>
                             <td>${item.cpf_cnpj_prestador}</td>
                             <td>${item.valor_apresentado}</td>
-                                                        <td class="${item.status === 'sucesso' ? 'status-success' : 'status-failure'}">${item.status}</td>
+                            <td> ${item.created_at}</td>
+                            <td>${item.data_atendimento}</td>
+                                                                                 <td class="${item.status === 'sucesso' ? 'status-success' : 'status-failure'}">${item.status}</td>
 
                             <td>${item.status_operacao}</td>
                                                         <td>${item.motivo_status_workflow}</td>
@@ -833,6 +855,7 @@ template = """
     </script>
 </head>
 <body>
+ 
  <header>
         <img src="https://saudepetrobras.com.br/data/files/5F/D3/80/3D/FDFEB7108831CAB7004CF9C2/logo_desktop.svg" alt="Logo">
         <h1>GPROTREE - Gestor de Protocolos de Reembolso</h1>
@@ -904,7 +927,47 @@ template = """
             }
         }
     </script>
+    
     </header>
+    <button class=\"menu-btn\" onclick=\"toggleMenu()\">☰</button>
+    <div class=\"sidebar\" id=\"sidebar\">
+        <h2 style=\"text-align:center\">Menu</h2>
+        <a href=\"/\" onclick=\"showContent()\">Início</a>
+        <a href=\"#\" onclick=\"abrirOutraAplicacao()\">Inventário de Aplicações</a>
+        <a href=\"/logout\">Sair</a>
+    </div>
+    <div class=\"content\" id=\"content\">
+        <h1 id=\"main-title\">Bem-vindo !</h1>
+        <p id=\"main-text\">Selecione uma opção no menu lateral.</p>
+        <iframe id=\"appIframe\" class=\"iframe-container\"></iframe>
+    </div>
+    <script>
+        function toggleMenu() {
+            const sidebar = document.getElementById('sidebar');
+            const content = document.getElementById('content');
+            if (sidebar.style.left === "0px") {
+                sidebar.style.left = "-250px";
+                content.style.marginLeft = "20px";
+            } else {
+                sidebar.style.left = "0px";
+                content.style.marginLeft = "260px";
+            }
+        }
+
+        function abrirOutraAplicacao() {
+            document.getElementById('main-title').style.display = 'none';
+            document.getElementById('main-text').style.display = 'none';
+            const iframe = document.getElementById('appIframe');
+            iframe.style.display = 'block';
+            iframe.src = 'https://spetrobras.pythonanywhere.com/'; // Substitua pela URL da aplicação desejada
+        }
+
+        function showContent() {
+            document.getElementById('main-title').style.display = 'block';
+            document.getElementById('main-text').style.display = 'block';
+            document.getElementById('appIframe').style.display = 'none';
+        }
+    </script>
 <h1>Estatísticas</h1>
 
 <div class="charts-container">
@@ -1043,6 +1106,9 @@ template = """
                 <option value="sucesso">Sucesso</option>
                 <option value="falha">Falha</option>
             </select>
+             <label for="protocolo">Protocolo:</label>
+    <input type="text" id="protocolo" name="protocolo" placeholder="Digite o número do protocolo">
+
             <button type="submit">Gerar Relatório PDF</button>
         </form>
 
@@ -1073,12 +1139,16 @@ template = """
                     <th>Nome</th>
                     <th>CPF/CNPJ</th>
                     <th>Valor</th>
+                    <th>Data Atendimento</th>
+                    <th>Data Solicitação</th>
                     <th>Status Integração:</th>
                     <th>Status Operação</th>
                     <th>Motivo Status Workflow</th>
                     <th>Ações</th>
                 </tr>
             </thead>
+            
+                            
             <tbody>
                 {% for item in data %}
                 <tr>
@@ -1086,6 +1156,8 @@ template = """
                     <td>{{ item.nome_completo }}</td>
                     <td>{{ item.cpf_cnpj_prestador }}</td>
                     <td>{{ item.valor_apresentado }}</td>
+                    <td>{{ item.data_atendimento }}</td>
+                    <td>{{ item.created_at }}</td>
                     <td class="{{ 'status-success' if item.status == 'sucesso' else 'status-failure' }}">{{ item.status }}</td>
                    <td>{{ item.status_operacao }}</td>
                     <td>{{ item.motivo_status_workflow }}</td>
@@ -1154,6 +1226,8 @@ template = """
                     <th>Nome</th>
                     <th>CPF/CNPJ</th>
                     <th>Valor</th>
+                    <th>Data Atendimento</th>
+                    <th>Data Solicitação</th>
                     <th>Status Integração</th>
                     <th>Status Operação</th>
                     <th>Motivo Status Workflow</th>
@@ -1167,6 +1241,8 @@ template = """
                     <td>{{ item.nome_completo }}</td>
                     <td>{{ item.cpf_cnpj_prestador }}</td>
                     <td>{{ item.valor_apresentado }}</td>
+                     <td>{{ item.data_atendimento }}</td>
+                    <td>{{ item.created_at }}</td>
                     <td class="{{ 'status-success' if item.status == 'sucesso' else 'status-failure' }}">{{ item.status }}</td>
                    <td>{{ item.status_operacao }}</td>
                     <td>{{ item.motivo_status_workflow }}</td>
@@ -1393,8 +1469,20 @@ def generate_report():
         start_date = request.form.get("start_date")
         end_date = request.form.get("end_date")
         status_filter = request.form.get("status")
+        protocolo = request.form.get("protocolo")
 
         log_data = load_log_data()
+        # Filtragem por protocolo se preenchido
+        if protocolo:
+            log_data = [item for item in log_data if str(item.get("protocolo")) == protocolo]
+
+        # Filtragem por data e status se necessário
+        if start_date:
+            log_data = [item for item in log_data if item.get("created_at") and item["created_at"] >= start_date]
+        if end_date:
+            log_data = [item for item in log_data if item.get("created_at") and item["created_at"] <= end_date]
+        if status_filter:
+            log_data = [item for item in log_data if item["status"] == status_filter]
         pdf = CustomPDF(orientation='L', unit='mm', format='A4')
         pdf.add_page()
         pdf.set_font("Arial", size=10)
@@ -1836,9 +1924,9 @@ def ask():
 
     try:
         # Processar os logs completos divididos em chunks
-      #  response = log_ai.process_full_logs(question)
+        #response = log_ai.process_full_logs(question)
         return ''
-      #  return jsonify({"response": response})
+        #return jsonify({"response": response})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
