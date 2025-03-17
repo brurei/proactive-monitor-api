@@ -7,3 +7,4 @@ gunicorn
 requests==2.32.2
 matplotlib==3.9.2
 tiktoken
+torch
