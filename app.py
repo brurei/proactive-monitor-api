@@ -14,7 +14,6 @@ import math
 from fpdf import FPDF
 import pandas as pd
 from matplotlib import pyplot as plt
-#from sentence_transformers import SentenceTransformer
 
 app = Flask(__name__)
 
