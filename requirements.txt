@@ -5,5 +5,5 @@ pandas==2.2.3
 matplotlib==3.9.2
 gunicorn
 requests==2.32.2
-matplotlib==3.9.2
 tiktoken
+sentence-transformers==2.5.1
