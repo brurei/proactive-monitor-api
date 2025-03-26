@@ -6,7 +6,7 @@ import random
 
 import requests
 import tiktoken
-#import torch
+import torch
 from flasgger import Swagger, swag_from
 
 from flask import Flask, render_template_string, request, jsonify, send_file, session, redirect, url_for
@@ -14,7 +14,7 @@ import math
 from fpdf import FPDF
 import pandas as pd
 from matplotlib import pyplot as plt
-from sentence_transformers import SentenceTransformer
+#from sentence_transformers import SentenceTransformer
 
 app = Flask(__name__)
 
