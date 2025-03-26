@@ -6,7 +6,7 @@ import random
 
 import requests
 import tiktoken
-import torch
+#import torch
 from flasgger import Swagger, swag_from
 
 from flask import Flask, render_template_string, request, jsonify, send_file, session, redirect, url_for
@@ -74,7 +74,7 @@ class LogAI:
     #        self.embeddings.append(batch_embeddings)
 
         # Concatenar todos os embeddings em um único tensor
-        self.embeddings = torch.cat(self.embeddings)
+       # self.embeddings = torch.cat(self.embeddings)
     def calculate_token_count(self, text):
         """Calculate the number of tokens in a given text."""
         encoding = tiktoken.get_encoding("cl100k_base")  # Modelo compatível com GPT-4
